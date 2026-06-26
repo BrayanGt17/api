@@ -1,6 +1,5 @@
 // stream.js
 module.exports = async (req, res) => {
-    // Forzar las cabeceras CORS para que tu web de GitHub pueda leerlo sin bloqueos
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -12,7 +11,6 @@ module.exports = async (req, res) => {
     try {
         const targetUrl = 'https://latamvidzfy.org/dsportsar.php';
 
-        // Petición al backend emulando el referer de Fútbol Libre
         const response = await fetch(targetUrl, {
             headers: {
                 'Referer': 'https://futbol-libres.su/',
@@ -26,11 +24,29 @@ module.exports = async (req, res) => {
 
         let html = await response.text();
 
-        // Reemplazar rutas relativas para que no se rompan las imágenes ni scripts internos
+        // 1. Inyectar un antibloqueo al inicio del HTML para congelar intentos de redirección
+        const antiRedirectScript = `
+        <script>
+            // Bloquear intentos de romper el iframe o redirigir la pestaña
+            window.onbeforeunload = function() { return "Bloqueando redirección automática."; };
+            Object.defineProperty(window, 'location', {
+                writable: false,
+                configurable: false,
+                value: window.location
+            });
+        </script>
+        `;
+        html = html.replace('<head>', '<head>' + antiRedirectScript);
+
+        // 2. Romper manualmente los scripts comunes de redirección antipiratería en el texto
+        html = html.replace(/window\.location\.href/g, '// window.location.href');
+        html = html.replace(/window\.location\.replace/g, '// window.location.replace');
+        html = html.replace(/top\.location/g, '// top.location');
+
+        // 3. Corregir las rutas de las dependencias e imágenes
         html = html.replace(/src="/g, 'src="https://latamvidzfy.org/');
         html = html.replace(/href="/g, 'href="https://latamvidzfy.org/');
 
-        // Enviar la respuesta como HTML puro al iframe
         res.setHeader('Content-Type', 'text/html');
         return res.status(200).send(html);
 
